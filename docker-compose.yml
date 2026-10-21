@@ -1,0 +1,148 @@
+name: pilahdok
+
+x-backend-environment: &backend-environment
+  PilahDok__MaxUploadBytes: ${PILAHDOK_MAX_UPLOAD_BYTES:-52428800}
+  PilahDok__MaxZipEntries: ${PILAHDOK_MAX_ZIP_ENTRIES:-2048}
+  PilahDok__MaxUncompressedBytes: ${PILAHDOK_MAX_UNCOMPRESSED_BYTES:-209715200}
+  PilahDok__MaxCompressionRatio: ${PILAHDOK_MAX_COMPRESSION_RATIO:-100}
+  PilahDok__JobTtlMinutes: ${PILAHDOK_JOB_TTL_MINUTES:-60}
+  PilahDok__DownloadGraceMinutes: ${PILAHDOK_DOWNLOAD_GRACE_MINUTES:-10}
+  PilahDok__ProcessingTimeoutSeconds: ${PILAHDOK_PROCESSING_TIMEOUT_SECONDS:-300}
+  PilahDok__RequestTimeoutSeconds: ${PILAHDOK_REQUEST_TIMEOUT_SECONDS:-30}
+  PilahDok__UploadTimeoutSeconds: ${PILAHDOK_UPLOAD_TIMEOUT_SECONDS:-120}
+  PilahDok__CleanupIntervalSeconds: ${PILAHDOK_CLEANUP_INTERVAL_SECONDS:-60}
+  PilahDok__RateLimitPerMinute: ${PILAHDOK_RATE_LIMIT_PER_MINUTE:-30}
+  PilahDok__AllowedOrigins__0: ${PILAHDOK_ALLOWED_ORIGINS:-http://localhost:3000}
+  PilahDok__AntivirusMode: ${PILAHDOK_ANTIVIRUS_MODE:-disabled}
+  PilahDok__ClamAvHost: ${PILAHDOK_CLAMAV_HOST:-clamav}
+  PilahDok__ClamAvPort: ${PILAHDOK_CLAMAV_PORT:-3310}
+  PilahDok__VisualPaginationEnabled: ${PILAHDOK_VISUAL_PAGINATION_ENABLED:-false}
+  PilahDok__RedisConnection: redis:6379,abortConnect=false
+  PilahDok__StorageRoot: /data/pilahdok/jobs
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    networks: [edge]
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      <<: *backend-environment
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - jobs-data:/data/pilahdok
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [edge, backend]
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      <<: *backend-environment
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - jobs-data:/data/pilahdok
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 1g
+    cpus: 1.5
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8081/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [backend]
+
+  redis:
+    image: redis:8.8.1-alpine@sha256:8096655e437712b07503796fb64d81359256cfcff0ab29d95a7da72863786efb
+    command: ["redis-server", "--appendonly", "no", "--save", "", "--maxmemory-policy", "noeviction"]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [backend]
+
+  e2e:
+    profiles: [test]
+    build:
+      context: .
+      dockerfile: tests/Dockerfile
+      target: e2e
+    environment:
+      E2E_BASE_URL: http://web:3000
+    depends_on:
+      web:
+        condition: service_healthy
+    ipc: host
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 512
+    mem_limit: 1g
+    networks: [edge]
+
+volumes:
+  jobs-data:
+
+networks:
+  edge:
+  backend:
+    internal: true

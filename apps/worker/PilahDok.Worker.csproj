@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>PilahDok.Worker</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../libs/PilahDok.Core/PilahDok.Core.csproj" />
+    <ProjectReference Include="../../libs/PilahDok.Infrastructure/PilahDok.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

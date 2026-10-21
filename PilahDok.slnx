@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="apps/api/PilahDok.Api.csproj" />
+  <Project Path="apps/worker/PilahDok.Worker.csproj" />
+  <Project Path="libs/PilahDok.Core/PilahDok.Core.csproj" />
+  <Project Path="libs/PilahDok.Infrastructure/PilahDok.Infrastructure.csproj" />
+  <Project Path="tests/PilahDok.Testing/PilahDok.Testing.csproj" />
+  <Project Path="tests/PilahDok.Tests/PilahDok.Tests.csproj" />
+  <Project Path="tools/PilahDok.FixtureGenerator/PilahDok.FixtureGenerator.csproj" />
+</Solution>

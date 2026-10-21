@@ -1,0 +1,11 @@
+services:
+  web:
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: http://api:8080/api/v1
+    ports: !reset []
+
+  api:
+    environment:
+      PilahDok__AllowedOrigins__0: http://web:3000
+    ports: !reset []
